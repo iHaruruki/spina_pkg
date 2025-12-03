@@ -15,9 +15,9 @@ $ source install/setup.bash
 sudo chmod 777 /dev/ttyUSB0
 ```
 > [!NOTE]
-> Please check USB port and change `launch/tatto_serial.launch.py` file.  
+> Please check USB port and change `launch/serial_controller.launc.py` file.  
 > USB portのを確認し，launchファイルを変更する
-`launch/tatto_serial.launch.py`
+`launch/serial_controller.launc.py`
 ```python
 import os
 from ament_index_python.packages import get_package_share_directory
