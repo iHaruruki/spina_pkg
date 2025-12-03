@@ -52,10 +52,8 @@ ros2 run spina_arm_controll angle_send_node --ros-args -p modules:="['r-15','p+1
 
 ### Sending angle with joy
 ```bash
+# This command is not necessary if you are connecting via Bluetooth.
 sudo chmod 777 /dev/ttyUSB0
-```
-```bash
-
 ```
 ```bash
 ros2 launch spina_arm_controll joy_spina.launch.py
