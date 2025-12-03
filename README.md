@@ -28,16 +28,16 @@ ros2 topic pub /angle_cmd std_msgs/msg/String "{ data: 'C1p-030' }" --once
 ```
 **Details of sending angle command**    
 Overall Control
-* A: 全体制御
-* 0: サブプレースホルダ
-* `p` or `r`: 姿勢の軸設定(p:Pitch, r:Yaw)
-* -090: -90度<br>
+* A: Overall Control / 全体制御
+* 0: 
+* `p` or `r`: Attitude axis setting (p: Pitch, r: Yaw) / 姿勢の軸設定(p:Pitch, r:Yaw)
+* -090: -90 degrees / -90度<br>
 
 Module Individual Control
-* C: モジュール制御
-* 1: モジュール番号（1-6）
-* `p` or `r`: 姿勢の軸設定(p:Pitch, r:Yaw)
-* -015: -15度<br>
+* C: Module Control / モジュール制御
+* 1: Module number (1-6) / モジュール番号（1-6）
+* `p` or `r`: Attitude axis setting (p: Pitch, r: Yaw) / 姿勢の軸設定(p:Pitch, r:Yaw)
+* -015: -15 degrees / -15度<br>
 
 ### Sending angle command with Node
 ```bash
