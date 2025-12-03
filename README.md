@@ -44,7 +44,7 @@ def generate_launch_description():
 Build
 ```bash
 cd ~/ros2_ws
-colcon build --symlink-install --packages-select apina_arm_controll
+colcon build --symlink-install --packages-select spina_arm_controll
 ```
 ```bash
 ros2 launch spina_arm_controll serial_controller.launc.py
@@ -82,7 +82,7 @@ ros2 run spina_arm_controll angle_send_node --ros-args -p modules:="['r-15','p+1
 - m5 → `r-020` （ヨー軸 –20°）
 - m6 → `p+030` （ピッチ軸 ＋30°）
 
-### Sending angle with joy
+### Sending angle with joy (DuakShok4)
 ```bash
 # This command is not necessary if you are connecting via Bluetooth.
 sudo chmod 777 /dev/ttyUSB0
