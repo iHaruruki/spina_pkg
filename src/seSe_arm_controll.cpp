@@ -1,5 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <rcl_interfaces/msg/set_parameters_result.hpp>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -17,7 +18,7 @@ public:
   : Node("arm_controller")
   {
     this->declare_parameter<std::string>("serial_port", "/dev/ttyUSB0");
-    this->declare_parameter<int>("baudrate", 2000000); // termios の speed_t に合わせて後で設定
+    this->declare_parameter<int>("baudrate", 2000000);
 
     // パラメータ取得
     serial_port_ = this->get_parameter("serial_port").as_string();
@@ -124,22 +125,25 @@ private:
     return true;
   }
 
+  // Jazzy 互換シグネチャ：const 参照で受け取る
   rcl_interfaces::msg::SetParametersResult onSetParameters(
-      const std::vector<rclcpp::Parameter>& params)
+      const std::vector<rclcpp::Parameter> & params)
   {
     rcl_interfaces::msg::SetParametersResult result;
-    result.successful = true;
-    result.reason = "ok";
+    result.set__successful(true);
+    result.set__reason("ok");
 
     std::string new_port = serial_port_;
     speed_t new_baud = baudrate_;
     bool need_reopen = false;
 
-    for (const auto& p : params) {
-      if (p.get_name() == "serial_port" && p.get_type() == rclcpp::ParameterType::PARAMETER_STRING) {
+    for (const auto & p : params) {
+      if (p.get_name() == "serial_port" && 
+          p.get_type() == rclcpp::ParameterType::PARAMETER_STRING) {
         new_port = p.as_string();
         need_reopen = true;
-      } else if (p.get_name() == "baudrate" && p.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
+      } else if (p.get_name() == "baudrate" && 
+                 p.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
         new_baud = to_speed_t(p.as_int());
         need_reopen = true;
       }
@@ -158,8 +162,8 @@ private:
         serial_port_ = old_port;
         baudrate_ = old_baud;
         (void)open_and_configure_serial(); // 元設定で再度オープン
-        result.successful = false;
-        result.reason = "Failed to reopen serial with new parameters";
+        result.set__successful(false);
+        result.set__reason("Failed to reopen serial with new parameters");
       } else {
         RCLCPP_INFO(this->get_logger(), "Serial reconfigured (port=%s)",
                     serial_port_.c_str());
