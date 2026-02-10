@@ -244,7 +244,8 @@ private:
   std::string serial_port_;
   speed_t baudrate_;
 
-  rclcpp::OnSetParametersCallbackHandle::SharedPtr params_callback_handle_;
+  // Jazzy では型名が変更されているため auto で型推論させる
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr params_callback_handle_;
 };
 
 int main(int argc, char * argv[])

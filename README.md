@@ -12,7 +12,7 @@ $ source install/setup.bash
 ## Usage
 ### Simple command
 ```bash
-sudo chmod 777 /dev/ttyUSB0
+sudo chmod 777 /dev/ttyUSB1
 ```
 > [!NOTE]
 > Please check USB port and change `launch/serial_controller.launc.py` file.  
@@ -47,7 +47,7 @@ cd ~/ros2_ws
 colcon build --symlink-install --packages-select spina_arm_controll
 ```
 ```bash
-ros2 launch spina_arm_controll serial_controller.launc.py
+ros2 run spina_arm_controll serial_controller_node --ros-args -p serial_port:=/dev/ttyUSB1
 ```
 **Sending angle command with command line interface tools**  
 Set the overall angle to -90°
