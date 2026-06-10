@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <cstring>
 #include <cerrno>
+#include <array>
+#include <optional>
 
 class ArmController : public rclcpp::Node
 {
@@ -17,14 +19,12 @@ public:
   : Node("arm_controller")
   {
     this->declare_parameter<std::string>("serial_port", "/dev/ttyUSB0");
-    this->declare_parameter<int>("baudrate", 2000000); // termios の speed_t に合わせて後で設定
+    this->declare_parameter<int>("baudrate", 2000000);
 
-    // パラメータ取得
     serial_port_ = this->get_parameter("serial_port").as_string();
     int baudrate_param = this->get_parameter("baudrate").as_int();
     baudrate_ = to_speed_t(baudrate_param);
 
-    // シリアル初期化
     if (!open_and_configure_serial()) {
       rclcpp::shutdown();
       return;
@@ -34,7 +34,6 @@ public:
       "angle_cmd", 50,
       std::bind(&ArmController::cmdCallback, this, std::placeholders::_1));
 
-    // パラメータ動的変更に対応（serial_port / baudrate）
     params_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&ArmController::onSetParameters, this, std::placeholders::_1));
 
@@ -44,44 +43,46 @@ public:
 
   ~ArmController() override
   {
+    close_serial();
+  }
+
+private:
+  // ============ シリアル制御 ============
+  static speed_t to_speed_t(int b)
+  {
+    // C++17 以降、構造化バインディングで効率化
+    static constexpr std::array<std::pair<int, speed_t>, 6> baud_map{{
+      {9600, B9600}, {19200, B19200}, {38400, B38400},
+      {57600, B57600}, {115200, B115200}, {2000000, B2000000}
+    }};
+
+    for (const auto& [rate, speed] : baud_map) {
+      if (rate == b) return speed;
+    }
+    return B2000000; // デフォルト
+  }
+
+  void close_serial()
+  {
     if (fd_ >= 0) {
       tcsetattr(fd_, TCSANOW, &oldtio_);
       close(fd_);
       fd_ = -1;
-    }
-  }
-
-private:
-  // termios 速度設定用に整数→speed_t へ変換
-  static speed_t to_speed_t(int b)
-  {
-    switch (b) {
-      case 9600: return B9600;
-      case 19200: return B19200;
-      case 38400: return B38400;
-      case 57600: return B57600;
-      case 115200: return B115200;
-      default: return B2000000;
     }
   }
 
   bool open_and_configure_serial()
   {
-    // 既に開いていれば閉じる
-    if (fd_ >= 0) {
-      tcsetattr(fd_, TCSANOW, &oldtio_);
-      close(fd_);
-      fd_ = -1;
-    }
+    close_serial();
 
-    fd_ = open(serial_port_.c_str(), O_RDWR | O_NOCTTY);
+    fd_ = open(serial_port_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd_ < 0) {
       RCLCPP_FATAL(this->get_logger(), "Failed to open %s: %s",
                    serial_port_.c_str(), std::strerror(errno));
       return false;
     }
 
-    // 現在設定の保存
+    struct termios newtio {};
     if (tcgetattr(fd_, &oldtio_) != 0) {
       RCLCPP_FATAL(this->get_logger(), "tcgetattr failed: %s", std::strerror(errno));
       close(fd_);
@@ -90,38 +91,33 @@ private:
     }
 
     // RAWモード設定
-    struct termios newtio;
-    std::memset(&newtio, 0, sizeof(newtio));
     cfmakeraw(&newtio);
     cfsetispeed(&newtio, baudrate_);
     cfsetospeed(&newtio, baudrate_);
     newtio.c_cflag |= (CLOCAL | CREAD | CS8);
 #ifdef CRTSCTS
-    // ハード/ソフトフロー制御OFF
     newtio.c_cflag &= ~CRTSCTS;
 #endif
     newtio.c_iflag &= ~(IXON | IXOFF | IXANY);
-
     newtio.c_cc[VMIN]  = 0;
-    newtio.c_cc[VTIME] = 1; // 0.1s
+    newtio.c_cc[VTIME] = 1;
 
     tcflush(fd_, TCIOFLUSH);
     if (tcsetattr(fd_, TCSANOW, &newtio) != 0) {
       RCLCPP_FATAL(this->get_logger(), "tcsetattr failed: %s", std::strerror(errno));
-      close(fd_);
-      fd_ = -1;
+      close_serial();
       return false;
     }
 
     return true;
   }
 
+  // ============ パラメータコールバック ============
   rcl_interfaces::msg::SetParametersResult onSetParameters(
       const std::vector<rclcpp::Parameter>& params)
   {
     rcl_interfaces::msg::SetParametersResult result;
     result.successful = true;
-    result.reason = "ok";
 
     std::string new_port = serial_port_;
     speed_t new_baud = baudrate_;
@@ -138,18 +134,16 @@ private:
     }
 
     if (need_reopen) {
-      // 反映を試みる
-      std::string old_port = serial_port_;
-      speed_t old_baud = baudrate_;
+      const auto old_port = serial_port_;
+      const auto old_baud = baudrate_;
 
       serial_port_ = new_port;
       baudrate_ = new_baud;
 
       if (!open_and_configure_serial()) {
-        // 失敗したら元に戻す
         serial_port_ = old_port;
         baudrate_ = old_baud;
-        (void)open_and_configure_serial(); // 元設定で再度オープン
+        open_and_configure_serial();
         result.successful = false;
         result.reason = "Failed to reopen serial with new parameters";
       } else {
@@ -161,61 +155,69 @@ private:
     return result;
   }
 
+  // ============ コマンド送信 ============
+  struct Command {
+    std::array<uint8_t, 11> data;
+  };
+
+  // パケット生成を分離（再利用可能に）
+  std::optional<Command> build_command(const std::string& buf, int module_id, int angle)
+  {
+    Command cmd;
+    cmd.data[0] = 0xAA;
+    cmd.data[1] = 0xC6;
+    cmd.data[2] = 0x00;
+    cmd.data[3] = 0x00;
+    cmd.data[4] = 'C';
+    cmd.data[5] = (module_id < 10) ? ('0' + module_id) : ('A' + (module_id - 10));
+    cmd.data[6] = buf[2];
+    cmd.data[7] = (angle < 0) ? '-' : '+';
+
+    int abs_angle = std::abs(angle);
+    cmd.data[8] = '0' + (abs_angle / 10);
+    cmd.data[9] = '0' + (abs_angle % 10);
+    cmd.data[10] = 0x55;
+
+    return cmd;
+  }
+
+  void send_command(const Command& cmd)
+  {
+    if (fd_ >= 0) {
+      ssize_t ret = write(fd_, cmd.data.data(), cmd.data.size());
+      if (ret < 0) {
+        RCLCPP_ERROR(this->get_logger(), "write failed: %s", std::strerror(errno));
+      }
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Serial not open. Command skipped.");
+    }
+  }
+
   void cmdCallback(const std_msgs::msg::String::SharedPtr msg)
   {
-    const std::string &buf = msg->data;
+    const auto& buf = msg->data;
     if (buf.size() < 7) {
-      RCLCPP_WARN(this->get_logger(), "Invalid command length");
+      RCLCPP_WARN(this->get_logger(), "Invalid command length: %zu", buf.size());
       return;
     }
 
-    // ±ddd 形式を想定（publisher側で常に符号付け）
     int sign = (buf[3] == '-') ? -1 : 1;
     int angle = ((buf[4]-'0')*100) + ((buf[5]-'0')*10) + (buf[6]-'0');
     angle *= sign;
 
-    char send[11];
-
-    if (buf[0]=='C' && -30 <= angle && angle <= 30) {
-      send[0] = 0xAA;
-      send[1] = 0xC6;
-      send[2] = 0x00;
-      send[3] = 0x00;
-      send[4] = 'C';
-      send[5] = buf[1];
-      send[6] = buf[2];
-      send[7] = buf[3]; // 符号
-      send[8] = (std::abs(angle)/10) + '0';
-      send[9] = (std::abs(angle) - ((std::abs(angle)/10) * 10)) + '0';
-      send[10] = 0x55;
-      if (fd_ >= 0) {
-        write(fd_, send, sizeof(send));
-        RCLCPP_INFO(this->get_logger(), "Sent command: %s", buf.c_str());
-      } else {
-        RCLCPP_ERROR(this->get_logger(), "Serial not open. Command skipped.");
+    if (buf[0] == 'C' && -30 <= angle && angle <= 30) {
+      auto cmd = build_command(buf, std::stoi(std::string(1, buf[1])), angle);
+      if (cmd) {
+        send_command(*cmd);
+        RCLCPP_DEBUG(this->get_logger(), "Sent command: %s", buf.c_str());
       }
     }
-    else if (buf[0]=='A' && -180 <= angle && angle <= 180) {
-      // 全体角度制御：各モジュールへ短いインターバルで送信
-      for (int i = 0; i < 6; i++) {
-        send[0] = 0xAA;
-        send[1] = 0xC6;
-        send[2] = 0x00;
-        send[3] = 0x00;
-        send[4] = 'C';
-        send[5] = i+1+'0';
-        send[6] = buf[2];
-        send[7] = buf[3]; // 符号
-        // 角度→プロトコルの2桁表現
-        int a = std::abs(angle);
-        send[8] = (a/60) + '0';
-        send[9] = (a/6 - ((a/60) * 10)) + '0';
-        send[10] = 0x55;
-        if (fd_ >= 0) {
-          write(fd_, send, sizeof(send));
-          RCLCPP_INFO(this->get_logger(), "Sent command to module %d: %s", i+1, buf.c_str());
-        } else {
-          RCLCPP_ERROR(this->get_logger(), "Serial not open. Command skipped for module %d.", i+1);
+    else if (buf[0] == 'A' && -180 <= angle && angle <= 180) {
+      for (int i = 1; i <= 6; i++) {
+        auto cmd = build_command(buf, i, angle / 6); // 角度を6等分
+        if (cmd) {
+          send_command(*cmd);
+          RCLCPP_DEBUG(this->get_logger(), "Sent command to module %d", i);
         }
         usleep(2000);
       }
