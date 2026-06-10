@@ -75,10 +75,10 @@ private:
     // Joy入力：状態更新時点でサチュレート
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (msg->axes.size() > 7) {
-            if (msg->axes[7] ==  1) up_down_   = clamp_deg(up_down_   - step_);
-            if (msg->axes[7] == -1) up_down_   = clamp_deg(up_down_   + step_);
-            if (msg->axes[6] ==  1) right_left_= clamp_deg(right_left_- step_);
-            if (msg->axes[6] == -1) right_left_= clamp_deg(right_left_+ step_);
+            //if (msg->axes[7] ==  1) up_down_   = clamp_deg(up_down_   - step_);
+            //if (msg->axes[7] == -1) up_down_   = clamp_deg(up_down_   + step_);
+            if (msg->axes[3] ==  1) right_left_= clamp_deg(right_left_- step_);
+            if (msg->axes[3] == -1) right_left_= clamp_deg(right_left_+ step_);
         }
     }
 
