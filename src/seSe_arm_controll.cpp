@@ -61,15 +61,7 @@ private:
       case 38400: return B38400;
       case 57600: return B57600;
       case 115200: return B115200;
-#ifdef B2000000
-      case 2000000: return B2000000;
-#endif
-#ifdef B1000000
-      case 1000000: return B1000000;
-#endif
-      default:
-        // 未対応の値なら最も一般的な 115200 にフォールバック
-        return B115200;
+      default: return B2000000;
     }
   }
 
