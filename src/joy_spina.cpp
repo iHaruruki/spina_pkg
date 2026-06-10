@@ -15,7 +15,7 @@ public:
       up_down_(0), right_left_(0)
     {
         // パラメータ（必要なら起動時に上書き可能）
-        publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 20.0);
+        publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 50.0);
         step_            = this->declare_parameter<int>("step", 2);
         min_deg_         = this->declare_parameter<int>("min_deg", -180);
         max_deg_         = this->declare_parameter<int>("max_deg",  180);
@@ -32,6 +32,7 @@ public:
 
         auto period = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::duration<double>(1.0 / std::max(1e-6, publish_rate_hz_)));
+
         timer_ = this->create_wall_timer(period, std::bind(&AngleSendNode::on_timer, this));
 
         RCLCPP_INFO(this->get_logger(),
