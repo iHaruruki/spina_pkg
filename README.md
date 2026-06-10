@@ -1,7 +1,9 @@
 # spina_arm_controll
-### Node and Topic
+
+## 🧩 Nodes & Topics
 ![](rosgraph.png)
-## Setup
+
+## 🛠️ Setup
 ```bash
 cd ~/ros2_ws/src  #Go to ros workspace
 git clone https://github.com/iHaruruki/spina_arm_controll.git #clone this package
@@ -9,7 +11,8 @@ cd ~/ros2_ws
 colcon build --symlink-install
 source install/setup.bash
 ```
-## Usage
+
+## 🎮 Usage
 ### Simple command
 ```bash
 sudo chmod 777 /dev/ttyUSB0
@@ -18,6 +21,7 @@ sudo chmod 777 /dev/ttyUSB0
 > Please check USB port and change `launch/serial_controller.launc.py` file.  
 > USB portのを確認し，launchファイルを変更する
 `launch/serial_controller.launc.py`
+
 ```python
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -41,6 +45,7 @@ def generate_launch_description():
         
     ])
 ```
+
 Build
 ```bash
 cd ~/ros2_ws
