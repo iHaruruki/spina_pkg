@@ -17,8 +17,8 @@ public:
         // パラメータ（必要なら起動時に上書き可能）
         publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 50.0);
         step_            = this->declare_parameter<int>("step", 2);
-        min_deg_         = this->declare_parameter<int>("min_deg", -180);
-        max_deg_         = this->declare_parameter<int>("max_deg",  180);
+        min_deg_         = this->declare_parameter<int>("min_deg", -90);
+        max_deg_         = this->declare_parameter<int>("max_deg",  90);
 
         // min/max の妥当化
         if (min_deg_ >= max_deg_) { min_deg_ = -180; max_deg_ = 180; }
@@ -78,8 +78,9 @@ private:
         if (msg->axes.size() > 7) {
             //if (msg->axes[7] ==  1) up_down_   = clamp_deg(up_down_   - step_);
             //if (msg->axes[7] == -1) up_down_   = clamp_deg(up_down_   + step_);
-            if (msg->axes[3] >  0) right_left_= clamp_deg(right_left_- step_);
-            if (msg->axes[3] > 0) right_left_= clamp_deg(right_left_+ step_);
+            if (msg->axes[3] >  0.2) right_left_= clamp_deg(right_left_- step_);
+            if (msg->axes[3] < -0.2) right_left_= clamp_deg(right_left_+ step_);
+            RCLCPP_INFO(this->get_logger(), "Subscribe /joy topic");
         }
     }
 
