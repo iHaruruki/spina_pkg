@@ -13,23 +13,32 @@ public:
     AngleCmdPublisher()
         : Node("angle_cmd_publisher"), messages_(
         {
-            "A0r-30", "A0r-29", "A0r-28", "A0r-27", "A0r-26", "A0r-25",
-            "A0r-24", "A0r-23", "A0r-22", "A0r-21", "A0r-20", "A0r-19",
-            "A0r-18", "A0r-17", "A0r-16", "A0r-15", "A0r-14", "A0r-13",
-            "A0r-12", "A0r-11", "A0r-10", "A0r-09", "A0r-08", "A0r-07",
-            "A0r-06", "A0r-05", "A0r-04", "A0r-03", "A0r-02", "A0r-01",
-            "A0r+00", "A0r+01", "A0r+02", "A0r+03", "A0r+04", "A0r+05",
-            "A0r+06", "A0r+07", "A0r+08", "A0r+09", "A0r+10", "A0r+11",
-            "A0r+12", "A0r+13", "A0r+14", "A0r+15", "A0r+16", "A0r+17",
-            "A0r+18", "A0r+19", "A0r+20", "A0r+21", "A0r+22", "A0r+23",
-            "A0r+24", "A0r+25", "A0r+26", "A0r+27", "A0r+28", "A0r+29",
-            "A0r+30",
+            "A0r-120", "A0r-115", "A0r-110", "A0r-105", "A0r-100",
+            "A0r-095", "A0r-090", "A0r-085", "A0r-080", "A0r-075",
+            "A0r-070", "A0r-065", "A0r-060", "A0r-055", "A0r-050",
+            "A0r-045", "A0r-040", "A0r-035", "A0r-030", "A0r-025",
+            "A0r-020", "A0r-015", "A0r-010", "A0r-005", "A0r+000",
+            "A0r+005", "A0r+010", "A0r+015", "A0r+020", "A0r+025",
+            "A0r+030", "A0r+035", "A0r+040", "A0r+045", "A0r+050",
+            "A0r+055", "A0r+060", "A0r+065", "A0r+070", "A0r+075",
+            "A0r+080", "A0r+085", "A0r+090", "A0r+095", "A0r+100",
+            "A0r+105", "A0r+110", "A0r+115", "A0r+120",
+            "A0r+115", "A0r+110", "A0r+105", "A0r+100", "A0r+095",
+            "A0r+090", "A0r+085", "A0r+080", "A0r+075", "A0r+070",
+            "A0r+065", "A0r+060", "A0r+055", "A0r+050", "A0r+045",
+            "A0r+040", "A0r+035", "A0r+030", "A0r+025", "A0r+020",
+            "A0r+015", "A0r+010", "A0r+005", "A0r+000", "A0r-005",
+            "A0r-010", "A0r-015", "A0r-020", "A0r-025", "A0r-030",
+            "A0r-035", "A0r-040", "A0r-045", "A0r-050", "A0r-055",
+            "A0r-060", "A0r-065", "A0r-070", "A0r-075", "A0r-080",
+            "A0r-085", "A0r-090", "A0r-095", "A0r-100", "A0r-105",
+            "A0r-110", "A0r-115", "A0r-120",
         }),
-        current_index_(0)
+    current_index_(0)
 
     {
         publisher_ = this->create_publisher<std_msgs::msg::String>("/angle_cmd", 10);
-        timer_ = this->create_wall_timer(2s, std::bind(&AngleCmdPublisher::publish_message, this));
+        timer_ = this->create_wall_timer(0.1s, std::bind(&AngleCmdPublisher::publish_message, this));
     }
 
 private:
