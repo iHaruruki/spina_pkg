@@ -6,7 +6,7 @@
 ## 🛠️ Setup
 ```bash
 cd ~/ros2_ws/src  #Go to ros workspace
-git clone https://github.com/iHaruruki/spina_arm_controll.git #clone this package
+git clone https://github.com/iHaruruki/spina_pkg.git #clone this package
 cd ~/ros2_ws
 colcon build --symlink-install
 source install/setup.bash
@@ -15,14 +15,17 @@ source install/setup.bash
 ## 🎮 Usage
 ### Simple command
 ```bash
-sudo chmod 777 /dev/ttyUSB1
+ls /dev/ttyUSB*
 ```
-> [!NOTE]
+```bash
+sudo chmod 777 /dev/ttyUSB0
+```
+<!-- > [!NOTE]
 > Please check USB port and change `launch/serial_controller.launc.py` file.  
 > USB portのを確認し，launchファイルを変更する
-`launch/serial_controller.launc.py`
+`launch/serial_controller.launc.py` -->
 
-```python
+<!-- ```python
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -44,7 +47,7 @@ def generate_launch_description():
         ),
         
     ])
-```
+``` -->
 
 Build
 ```bash
@@ -88,14 +91,14 @@ ros2 run spina_arm_controll angle_send_node --ros-args -p modules:="['r-15','p+1
 - m6 → `p+030` （ピッチ軸 ＋30°）
 
 ### Sending angle with joy (DuakShok4)
-```bash
+<!-- ```bash
 # This command is not necessary if you are connecting via Bluetooth.
 sudo chmod 777 /dev/ttyUSB0
-```
+``` -->
 ```bash
 ros2 launch spina_arm_controll joy_spina.launch.py
 ```
-## License
+
 ## Authors
 ![Haruki Isono](https://github.com/iHaruruki)
 ## References
