@@ -8,7 +8,7 @@
 cd ~/ros2_ws/src  #Go to ros workspace
 git clone https://github.com/iHaruruki/spina_pkg.git #clone this package
 cd ~/ros2_ws
-colcon build --symlink-install
+colcon build --symlink-install --packages-select spina_arm_controll
 source install/setup.bash
 ```
 
