@@ -32,7 +32,7 @@ public:
     }
 
     sub_ = this->create_subscription<std_msgs::msg::String>(
-      "angle_cmd", 50,
+      "/angle_cmd", 50,
       std::bind(&ArmController::cmdCallback, this, std::placeholders::_1));
 
     params_callback_handle_ = this->add_on_set_parameters_callback(
