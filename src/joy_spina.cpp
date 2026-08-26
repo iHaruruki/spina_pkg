@@ -24,7 +24,7 @@ public:
         if (min_deg_ >= max_deg_) { min_deg_ = -180; max_deg_ = 180; }
 
         pub_ = this->create_publisher<std_msgs::msg::String>(
-            "angle_cmd", rclcpp::QoS(10).reliable());
+            "/angle_cmd", rclcpp::QoS(10).reliable());
 
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "/joy", rclcpp::SensorDataQoS(),
