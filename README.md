@@ -55,7 +55,7 @@ cd ~/ros2_ws
 colcon build --symlink-install --packages-select spina_arm_controll
 ```
 ```bash
-ros2 run spina_arm_controll serial_controller_node --ros-args -p serial_port:=/dev/ttyUSB1
+ros2 run spina_arm_controll serial_controller_node --ros-args -p serial_port:=/dev/ttyUSB0
 ```
 **Sending angle command with command line interface tools**  
 Set the overall angle to -90°
