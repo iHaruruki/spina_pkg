@@ -1,154 +1,109 @@
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/string.hpp>
-#include <sensor_msgs/msg/joy.hpp>
-
-#include <string>
-#include <iomanip>
-#include <sstream>
 #include <chrono>
+#include <memory>
+#include <string>
 #include <algorithm>
-#include <cmath>     // std::abs, std::round
+#include <cstdio>
+#include <cmath>
+
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/int32.hpp"
+#include "sensor_msgs/msg/joy.hpp"
 
 using namespace std::chrono_literals;
 
-class AngleSendNode : public rclcpp::Node
+class AngleCmdPublisher : public rclcpp::Node
 {
 public:
-    AngleSendNode()
-    : Node("angle_send_node"),
-      up_down_(0.0),
-      right_left_(0.0)
-    {
-        // Parameters (overridable at launch)
-        publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 100.0);
-        step_            = this->declare_parameter<double>("step", 0.5);
-        min_deg_         = this->declare_parameter<double>("min_deg", -30.0);
-        max_deg_         = this->declare_parameter<double>("max_deg",  30.0);
-        deadzone_        = this->declare_parameter<double>("deadzone", 0.2);
+  AngleCmdPublisher()
+  : Node("angle_cmd_publisher"),
+    roll_angle_(0),
+    pitch_angle_(0)
+  {
+    cmd_publisher_   = this->create_publisher<std_msgs::msg::String>("/angle_cmd", 10);
+    roll_publisher_  = this->create_publisher<std_msgs::msg::Int32>("/roll_value", 10);
+    pitch_publisher_ = this->create_publisher<std_msgs::msg::Int32>("/pitch_value", 10);
 
-        // Validate range
-        if (min_deg_ >= max_deg_) {
-            min_deg_ = -180.0;
-            max_deg_ =  180.0;
-        }
-        if (step_ <= 0.0) {
-            step_ = 0.5;
-        }
+    joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+      "/joy", 10, std::bind(&AngleCmdPublisher::joy_callback, this, std::placeholders::_1));
 
-        // Publisher
-        pub_ = this->create_publisher<std_msgs::msg::String>(
-            "/angle_cmd", rclcpp::QoS(10).reliable());
-
-        // Joy subscriber
-        joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "/joy",
-            rclcpp::SensorDataQoS(),
-            std::bind(&AngleSendNode::joy_callback, this, std::placeholders::_1));
-
-        // Timer period from publish_rate_hz_
-        auto period = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::duration<double>(1.0 / std::max(1e-6, publish_rate_hz_)));
-
-        timer_ = this->create_wall_timer(period, std::bind(&AngleSendNode::on_timer, this));
-
-        RCLCPP_INFO(this->get_logger(),
-                    "publish @ %.2f Hz, step=%.3f, range=[%.1f,%.1f], deadzone=%.2f",
-                    publish_rate_hz_, step_, min_deg_, max_deg_, deadzone_);
-    }
+    timer_ = this->create_wall_timer(100ms, std::bind(&AngleCmdPublisher::publish_message, this));
+  }
 
 private:
-    double clamp_deg(double v) const
-    {
-        if (v > max_deg_) return max_deg_;
-        if (v < min_deg_) return min_deg_;
-        return v;
+  void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+  {
+    // 右スティック index（要確認）
+    // axes[3] : 右スティック左右 -> roll
+    // axes[4] : 右スティック上下 -> pitch
+    if (msg->axes.size() <= 4) return;
+
+    const float roll_axis  = msg->axes[3];
+    const float pitch_axis = msg->axes[4];
+
+    const float deadzone = 0.2f;
+    const int step = 2;  // 1 callbackあたりの角度変化量
+
+    if (std::fabs(roll_axis) >= deadzone) {
+      roll_angle_ += (roll_axis > 0.0f) ? step : -step;
     }
 
-    // Format: prefix + sign + zero-padded 3 digits (e.g., A0p+005, A0r-090)
-    // NOTE: value is rounded to nearest int before formatting.
-    std::string format_signed3(const std::string& prefix, double value) const
-    {
-        const int iv = static_cast<int>(std::round(value));
-
-        std::ostringstream ss;
-        ss << prefix
-           << (iv < 0 ? '-' : '+')
-           << std::setw(3) << std::setfill('0') << std::abs(iv);
-        return ss.str();
+    // 多くのゲームパッドは上方向が -1 なので、直感操作に合わせて符号反転
+    if (std::fabs(pitch_axis) >= deadzone) {
+      pitch_angle_ += (pitch_axis < 0.0f) ? step : -step;
     }
 
-    void publish_value(const char* prefix, double value)
-    {
-        std_msgs::msg::String out;
-        out.data = format_signed3(prefix, clamp_deg(value));
-        pub_->publish(out);
-    }
+    // リミッタ ±90°
+    roll_angle_  = std::clamp(roll_angle_,  -180, 180);
+    pitch_angle_ = std::clamp(pitch_angle_, -180, 180);
+  }
 
-    // Periodic send: publish both channels every cycle
-    void on_timer()
-    {
-        publish_value("A0p", up_down_);
-        publish_value("A0r", right_left_);
+  std::string format_joint_cmd(const char* joint_prefix, int angle)
+  {
+    // 例: "A0r+005", "A1p-030"
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%s%+04d", joint_prefix, angle);
+    return std::string(buf);
+  }
 
-        RCLCPP_INFO_THROTTLE(
-            this->get_logger(), *this->get_clock(), 2000,
-            "A0p=%.2f (%s)  A0r=%.2f (%s)",
-            clamp_deg(up_down_),
-            format_signed3("A0p", clamp_deg(up_down_)).c_str(),
-            clamp_deg(right_left_),
-            format_signed3("A0r", clamp_deg(right_left_)).c_str());
-    }
+  void publish_message()
+  {
+    // 2軸コマンドを1文字列にまとめる（受信側仕様に合わせて区切りを変更）
+    // 例: "A0r+010 A1p-020"
+    const std::string roll_cmd  = format_joint_cmd("A0r", roll_angle_);
+    const std::string pitch_cmd = format_joint_cmd("A0p", pitch_angle_);
+    const std::string full_cmd  = roll_cmd + " " + pitch_cmd;
 
-    // Right stick control (typical mapping):
-    // axes[3] = right stick left/right
-    // axes[4] = right stick up/down
-    void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
-        if (msg->axes.size() <= 4) {
-            return;
-        }
+    std_msgs::msg::String cmd_msg;
+    cmd_msg.data = full_cmd;
+    cmd_publisher_->publish(cmd_msg);
 
-        const double rx = static_cast<double>(msg->axes[3]);  // right stick horizontal
-        const double ry = static_cast<double>(msg->axes[4]);  // right stick vertical
+    std_msgs::msg::Int32 roll_msg;
+    roll_msg.data = roll_angle_;
+    roll_publisher_->publish(roll_msg);
 
-        // Vertical -> up_down_
-        if (ry > deadzone_) {
-            up_down_ = clamp_deg(up_down_ + step_);
-        } else if (ry < -deadzone_) {
-            up_down_ = clamp_deg(up_down_ - step_);
-        }
+    std_msgs::msg::Int32 pitch_msg;
+    pitch_msg.data = pitch_angle_;
+    pitch_publisher_->publish(pitch_msg);
 
-        // Horizontal -> right_left_
-        if (rx > deadzone_) {
-            right_left_ = clamp_deg(right_left_ - step_);
-        } else if (rx < -deadzone_) {
-            right_left_ = clamp_deg(right_left_ + step_);
-        }
+    RCLCPP_INFO(this->get_logger(), "Publishing: '%s' (roll=%d, pitch=%d)",
+                full_cmd.c_str(), roll_angle_, pitch_angle_);
+  }
 
-        RCLCPP_DEBUG_THROTTLE(
-            this->get_logger(), *this->get_clock(), 1000,
-            "joy rx=%.3f ry=%.3f -> up_down=%.2f right_left=%.2f",
-            rx, ry, up_down_, right_left_);
-    }
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr cmd_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr roll_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pitch_publisher_;
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
+  rclcpp::TimerBase::SharedPtr timer_;
 
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_;
-    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
-    rclcpp::TimerBase::SharedPtr timer_;
-
-    double up_down_;
-    double right_left_;
-
-    double publish_rate_hz_;
-    double step_;
-    double min_deg_;
-    double max_deg_;
-    double deadzone_;
+  int roll_angle_;
+  int pitch_angle_;
 };
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<AngleSendNode>());
-    rclcpp::shutdown();
-    return 0;
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<AngleCmdPublisher>());
+  rclcpp::shutdown();
+  return 0;
 }
