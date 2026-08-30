@@ -147,7 +147,7 @@ private:
       if (!open_and_configure_serial()) {
         serial_port_ = old_port;
         baudrate_ = old_baud;
-        (void)open_and_configure_serial(); // 元設定で再度オープン
+        (void)open_and_configure_serial();
         result.set__successful(false);
         result.set__reason("Failed to reopen serial with new parameters");
       } else {
@@ -164,7 +164,6 @@ private:
     std::array<uint8_t, 11> data;
   };
 
-  // パケット生成を分離（再利用可能に）
   std::optional<Command> build_command(const std::string& buf, int module_id, int angle)
   {
     Command cmd;
@@ -218,7 +217,7 @@ private:
     }
     else if (buf[0] == 'A' && -180 <= angle && angle <= 180) {
       for (int i = 1; i <= 6; i++) {
-        auto cmd = build_command(buf, i, angle / 6); // 角度を6等分
+        auto cmd = build_command(buf, i, angle / 6);
         if (cmd) {
           send_command(*cmd);
           RCLCPP_DEBUG(this->get_logger(), "Sent command to module %d", i);
@@ -238,7 +237,6 @@ private:
   std::string serial_port_;
   speed_t baudrate_;
 
-  // Jazzy では型名が変更されているため auto で型推論させる
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr params_callback_handle_;
 };
 
